@@ -5,28 +5,50 @@ import AsyncStorage from '@react-native-async-storage/async-storage'; // 添加�
 import { fetchTodos, deleteTodo, updateTodo } from '../services/todoService';
 import { useNavigation } from 'expo-router';
 
-// 自定义待办事项组件
-const TodoItem = ({ item, onDelete, onToggleComplete }) => (
-  <View style={styles.todoItem}>
-    <TouchableOpacity
-      style={styles.completeButton}
-      onPress={() => onToggleComplete(item.id, !item.completed)}
-    >
-      {item.completed && <Text style={styles.checkMark}>✓</Text>}
-    </TouchableOpacity>
-    <View style={styles.todoContent}>
-      <Text style={[styles.todoText, item.completed && styles.completedText]}>
-        {item.title}
-      </Text>
-      {item.dueDate && (
-        <Text style={styles.dueDate}>
-          截止日期: {new Date(item.dueDate).toLocaleDateString()}
+// 导入路由
+import { useRouter } from 'expo-router';
+
+// 修改TodoItem组件
+const TodoItem = ({ item, onDelete, onToggleComplete }) => {
+  const router = useRouter();
+  
+  return (
+    <View style={styles.todoItem}>
+      <TouchableOpacity
+        style={styles.completeButton}
+        onPress={() => onToggleComplete(item.id, !item.completed)}
+      >
+        {item.completed && <Text style={styles.checkMark}>✓</Text>}
+      </TouchableOpacity>
+      
+      <View style={styles.todoContent}>
+        <Text style={[styles.todoText, item.completed && styles.completedText]}>
+          {item.title}
         </Text>
-      )}
+        {item.dueDate && (
+          <Text style={styles.dueDate}>
+            截止日期: {new Date(item.dueDate).toLocaleDateString()}
+          </Text>
+        )}
+      </View>
+      
+      <View style={styles.buttons}>
+        <TouchableOpacity 
+          style={styles.editButton}
+          onPress={() => router.push({ pathname: '/edit', params: { todo: JSON.stringify(item) } })}
+        >
+          <Text style={styles.editText}>编辑</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.deleteButton}
+          onPress={() => onDelete(item.id)}
+        >
+          <Text style={styles.deleteText}>删除</Text>
+        </TouchableOpacity>
+      </View>
     </View>
-    <Button title="删除" onPress={() => onDelete(item.id)} color="#ff3b30" />
-  </View>
-);
+  );
+};
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -266,6 +288,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+  },
+  buttons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  editText: {
+    color: 'white',
+    fontSize: 12,
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  deleteText: {
+    color: 'white',
+    fontSize: 12,
   },
 });
 
