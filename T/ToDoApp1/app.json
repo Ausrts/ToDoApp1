@@ -1,6 +1,6 @@
 {
   "expo": {
-    "scheme":"ToDoapp",
+    "scheme": "ToDoapp",
     "name": "ToDoApp1",
     "slug": "ToDoApp1",
     "version": "1.0.0",
@@ -24,10 +24,14 @@
       "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "device": "iPhone13"  
     },
     "plugins": [
       "expo-router"
-    ]
+    ],
+    "env": {
+      "EXPO_ROUTER_APP_ROOT": "./app"
+    }
   }
 }

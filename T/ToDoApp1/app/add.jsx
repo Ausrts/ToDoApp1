@@ -11,6 +11,7 @@ export default function AddTodoScreen() {
   const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const navigation = useNavigation();
   const queryClient = useQueryClient();
 
@@ -64,13 +65,57 @@ export default function AddTodoScreen() {
   const handleDateChange = (event, selectedDate) => {
     setShowDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
-      setDueDate(selectedDate);
+      // 检查选择的日期是否是今天之前
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (selectedDate < today) {
+        Alert.alert(
+          '日期提示',
+          `您选择的日期 ${selectedDate.toLocaleDateString()} 是今天之前的日期，确定要添加吗？`,
+          [
+            {
+              text: '确定',
+              style: 'default',
+              onPress: () => {
+                setDueDate(selectedDate);
+              }
+            },
+            {
+              text: '重新选择',
+              style: 'cancel',
+              onPress: () => {
+                // 重新打开日期选择器
+                setShowDatePicker(true);
+              }
+            }
+          ]
+        );
+      } else {
+        setDueDate(selectedDate);
+      }
+    }
+  };
+
+  // 处理时间选择
+  const handleTimeChange = (event, selectedTime) => {
+    setShowTimePicker(Platform.OS === 'ios');
+    if (selectedTime) {
+      const newDate = new Date(dueDate);
+      newDate.setHours(selectedTime.getHours());
+      newDate.setMinutes(selectedTime.getMinutes());
+      setDueDate(newDate);
     }
   };
 
   // 显示日期选择器
   const showDatePickerDialog = () => {
     setShowDatePicker(true);
+  };
+
+  // 显示时间选择器
+  const showTimePickerDialog = () => {
+    setShowTimePicker(true);
   };
 
   // 处理表单提交
@@ -120,6 +165,25 @@ export default function AddTodoScreen() {
             mode="date"
             display="default"
             onChange={handleDateChange}
+          />
+        )}
+      </View>
+
+      <View style={styles.dateContainer}>
+        <Button
+          title="设置提醒时间"
+          onPress={showTimePickerDialog}
+          color="#0066cc"
+        />
+        <Text style={styles.dateText}>
+          提醒时间: {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </Text>
+        {showTimePicker && (
+          <DateTimePicker
+            value={dueDate}
+            mode="time"
+            display="spinner"
+            onChange={handleTimeChange}
           />
         )}
       </View>

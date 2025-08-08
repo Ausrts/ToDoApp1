@@ -97,9 +97,13 @@ export const addTodo = async (todoData) => {
 };
 
 // 更新待办事项
-export const updateTodo = async (id, todoData) => {
-  const response = await axios.put(`${API_URL}/${id}`, todoData);
-  return response.data;
+export const updateTodo = async (updatedTodo) => {
+  const todos = await fetchTodos();
+  const newTodos = todos.map(t => 
+    t.id === updatedTodo.id ? updatedTodo : t
+  );
+  await Storage.setItem('@todos', JSON.stringify(newTodos));
+  return updatedTodo;
 };
 
 // 删除待办事项
