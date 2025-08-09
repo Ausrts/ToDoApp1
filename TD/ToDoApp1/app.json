@@ -14,18 +14,15 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "useNextNotificationsApi": true
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true
+      "useNextNotificationsApi": true,
+      "package": "com.anonymous.ToDoApp1"
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "device": "iPhone13"  
+      "device": "iPhone13"
     },
     "plugins": [
       "expo-router"

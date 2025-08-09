@@ -1,11 +1,10 @@
-import { StyleSheet, Text, View, TextInput, Button, Alert, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-// Update import path
 import { addTodo } from '../services/todoService';
 import { useNavigation } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // Add this line
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert, StyleSheet, View, Text, TextInput, Button, Platform } from 'react-native';
 
 export default function AddTodoScreen() {
   const [title, setTitle] = useState('');
@@ -15,27 +14,56 @@ export default function AddTodoScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
 
-  // Mutation for adding a to-do item
-  // Modify the onSuccess callback of addMutation
+  // ✅ 使用setTimeout+Alert的兼容提醒系统
+  const scheduleLocalReminder = (todoTitle, dueDate) => {
+    const now = new Date();
+    const fiveMinBefore = new Date(dueDate);
+    fiveMinBefore.setMinutes(fiveMinBefore.getMinutes() - 5);
+    
+    // 5分钟前提醒
+    if (fiveMinBefore > now) {
+      const delay = fiveMinBefore.getTime() - now.getTime();
+      console.log(`⏰ 设置5分钟前提醒: "${todoTitle}" 将在 ${Math.round(delay/1000)} 秒后提醒`);
+      setTimeout(() => {
+        Alert.alert('⏰ 待办提醒', `"${todoTitle}" 还有5分钟到期`);
+      }, delay);
+    }
+    
+    // 到期提醒
+    if (dueDate > now) {
+      const delay = dueDate.getTime() - now.getTime();
+      console.log(`🔔 设置到期提醒: "${todoTitle}" 将在 ${Math.round(delay/1000)} 秒后提醒`);
+      setTimeout(() => {
+        Alert.alert('🔔 待办到期', `"${todoTitle}" 现在到期了`);
+      }, delay);
+    }
+  };
+
+  // 显示添加成功通知
+  const showLocalNotification = (todoTitle) => {
+    Alert.alert(
+      '✅ 待办已添加',
+      `"${todoTitle}" 已成功添加，将在指定时间提醒您！`,
+      [{ text: '确定' }]
+    );
+  };
+
+  // ✅ 修正后的Mutation，使用scheduleLocalReminder
   const addMutation = useMutation({
     mutationFn: addTodo,
     onSuccess: async (newTodo) => {
-      // Add debug log to check the structure of the API response
-      console.log('API returned new todo:', newTodo);
-
       try {
         const existingTodos = JSON.parse(await AsyncStorage.getItem('@todos')) || [];
 
-        // Check existing IDs and generate a new ID until it is unique
+        // 生成唯一ID
         const existingIds = existingTodos.map(todo => todo.id);
         let newId = Date.now() + Math.floor(Math.random() * 1000);
         while (existingIds.includes(newId)) {
           newId = Date.now() + Math.floor(Math.random() * 1000);
         }
 
-        // Ensure the new to-do item has the correct structure
         const todoToAdd = {
-          id: newId, // Use the conflict-checked ID
+          id: newId,
           title: newTodo.title || title.trim(),
           completed: newTodo.completed || false,
           userId: newTodo.userId || 1,
@@ -43,21 +71,22 @@ export default function AddTodoScreen() {
         };
         
         const updatedTodos = [...existingTodos, todoToAdd];
-        console.log('Updated to-do list:', updatedTodos);
-        
         await AsyncStorage.setItem('@todos', JSON.stringify(updatedTodos));
         
-        // Add cache invalidation
         queryClient.invalidateQueries({ queryKey: ['todos'] });
-        Alert.alert('Success', 'To-do item added');
+        
+        // ✅ 使用兼容的提醒系统
+        scheduleLocalReminder(todoToAdd.title, new Date(todoToAdd.dueDate));
+        showLocalNotification(todoToAdd.title);
+        
         navigation.goBack();
       } catch (error) {
-        console.error('Failed to save to local storage:', error);
-        Alert.alert('Error', 'Save failed, please try again');
+        console.error('保存失败:', error);
+        Alert.alert('错误', '保存失败，请重试');
       }
     },
     onError: (error) => {
-      Alert.alert('Error', `Add failed: ${error.message}`);
+      Alert.alert('错误', `添加失败: ${error.message}`);
     },
   });
 
@@ -65,17 +94,16 @@ export default function AddTodoScreen() {
   const handleDateChange = (event, selectedDate) => {
     setShowDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
-      // Check if the selected date is before today
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
       if (selectedDate < today) {
         Alert.alert(
-          'Date Notice',
-          `The date you selected ${selectedDate.toLocaleDateString()} is in the past. Do you still want to add it?`,
+          '日期提示',
+          `选择的日期 ${selectedDate.toLocaleDateString()} 是过去的日期，您确定要添加吗？`,
           [
-            { text: 'Confirm', style: 'default', onPress: () => setDueDate(selectedDate) },
-            { text: 'Reselect', style: 'cancel', onPress: () => setShowDatePicker(true) }
+            { text: '确定', onPress: () => setDueDate(selectedDate) },
+            { text: '重新选择', onPress: () => setShowDatePicker(true) }
           ]
         );
       } else {
@@ -84,7 +112,6 @@ export default function AddTodoScreen() {
     }
   };
 
-  // Handle time selection
   const handleTimeChange = (event, selectedTime) => {
     setShowTimePicker(Platform.OS === 'ios');
     if (selectedTime) {
@@ -95,43 +122,30 @@ export default function AddTodoScreen() {
     }
   };
 
-  // Show date picker
-  const showDatePickerDialog = () => {
-    setShowDatePicker(true);
-  };
+  const showDatePickerDialog = () => setShowDatePicker(true);
+  const showTimePickerDialog = () => setShowTimePicker(true);
 
-  // Show time picker
-  const showTimePickerDialog = () => {
-    setShowTimePicker(true);
-  };
-
-  // Handle form submission
-  // Modify the submission data to include userId
   const handleSubmit = () => {
     if (!title.trim()) {
-      Alert.alert('Input Error', 'Please enter a to-do title');
+      Alert.alert('输入错误', '请输入待办标题');
       return;
     }
 
-    // Add debug log to check the submitted data
-    const newTodoData = {
+    addMutation.mutate({
       title: title.trim(),
       completed: false,
       userId: 1,
-      dueDate: dueDate.toISOString() // Add date field
-    };
-    console.log('Submitted to-do data:', newTodoData);
-
-    addMutation.mutate(newTodoData);
+      dueDate: dueDate.toISOString()
+    });
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Add New To-Do</Text>
+      <Text style={styles.title}>添加新待办</Text>
 
       <TextInput
         style={styles.input}
-        placeholder="Enter to-do title"
+        placeholder="请输入待办标题"
         value={title}
         onChangeText={setTitle}
         autoFocus
@@ -139,12 +153,12 @@ export default function AddTodoScreen() {
 
       <View style={styles.dateContainer}>
         <Button
-          title="Select Due Date"
+          title="选择截止日期"
           onPress={showDatePickerDialog}
           color="#017BFF"
         />
         <Text style={styles.dateText}>
-          Selected: {dueDate.toLocaleDateString()}
+          已选择: {dueDate.toLocaleDateString()}
         </Text>
         {showDatePicker && (
           <DateTimePicker
@@ -158,12 +172,12 @@ export default function AddTodoScreen() {
 
       <View style={styles.dateContainer}>
         <Button
-          title="Set Reminder Time"
+          title="设置提醒时间"
           onPress={showTimePickerDialog}
           color="#017BFF"
         />
         <Text style={styles.dateText}>
-          Reminder Time: {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          提醒时间: {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </Text>
         {showTimePicker && (
           <DateTimePicker
@@ -177,13 +191,12 @@ export default function AddTodoScreen() {
 
       <View style={styles.buttonContainer}>
         <Button
-          title="Cancel"
+          title="取消"
           onPress={() => navigation.goBack()}
-          style={styles.cancelButton}
           color="#017BFF"
         />
         <Button
-          title="Add"
+          title="添加"
           onPress={handleSubmit}
           color="#017BFF"
           disabled={addMutation.isPending}
@@ -228,8 +241,5 @@ const styles = StyleSheet.create({
     gap: 16,
     justifyContent: 'center',
     marginTop: 24,
-  },
-  cancelButton: {
-    flex: 1,
   },
 });

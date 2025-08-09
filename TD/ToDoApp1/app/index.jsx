@@ -7,9 +7,51 @@ import { useNavigation } from 'expo-router';
 import { useRouter } from 'expo-router';
 
 // Modify TodoItem component to support selection mode
+// Replace this part in the TodoItem component with smart year display
 const TodoItem = ({ item, onDelete, onToggleComplete, isSelecting, isSelected, onSelect }) => {
   const router = useRouter();
   
+  // Function to format date and time
+  const formatDueDate = (dueDateStr) => {
+    if (!dueDateStr) return null;
+    
+    const date = new Date(dueDateStr);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const itemYear = date.getFullYear();
+    
+    // Check if it is the current year
+    const isCurrentYear = currentYear === itemYear;
+    
+    // Determine display format based on year
+    const options = isCurrentYear 
+      ? {
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        }
+      : {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        };
+    
+    return date.toLocaleString('en-US', options);
+  };
+
+  // 处理点击整个事项
+  const handleItemPress = () => {
+    if (isSelecting) {
+      onSelect(item.id);
+    } else {
+      // 点击进入编辑页面
+      router.push({ pathname: '/edit', params: { todo: JSON.stringify(item) } });
+    }
+  };
+
   return (
     <TouchableOpacity 
       style={[
@@ -17,8 +59,7 @@ const TodoItem = ({ item, onDelete, onToggleComplete, isSelecting, isSelected, o
         isSelecting && styles.selectingItem,
         isSelected && styles.selectedItem
       ]}
-      onPress={() => isSelecting && onSelect(item.id)}
-      disabled={!isSelecting}
+      onPress={handleItemPress}
     >
       {isSelecting && (
         <View style={[styles.selectButton, isSelected && styles.selectedButton]}>
@@ -29,7 +70,10 @@ const TodoItem = ({ item, onDelete, onToggleComplete, isSelecting, isSelected, o
       {!isSelecting && (
         <TouchableOpacity
           style={styles.completeButton}
-          onPress={() => onToggleComplete(item.id, !item.completed)}
+          onPress={(e) => {
+            e.stopPropagation(); // 阻止事件冒泡
+            onToggleComplete(item.id, !item.completed);
+          }}
         >
           {item.completed && <Text style={styles.checkMark}>✓</Text>}
         </TouchableOpacity>
@@ -41,22 +85,20 @@ const TodoItem = ({ item, onDelete, onToggleComplete, isSelecting, isSelected, o
         </Text>
         {item.dueDate && (
           <Text style={styles.dueDate}>
-            Due Date: {new Date(item.dueDate).toLocaleDateString()}
+            {formatDueDate(item.dueDate)}
           </Text>
         )}
       </View>
       
       {!isSelecting && (
         <View style={styles.buttons}>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.editButton]}
-            onPress={() => router.push({ pathname: '/edit', params: { todo: JSON.stringify(item) } })}
-          >
-            <Text style={styles.editText}>Edit</Text>
-          </TouchableOpacity>
+          {/* 移除了 Edit 按钮，只保留 Delete 按钮 */}
           <TouchableOpacity 
             style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => onDelete(item.id)}
+            onPress={(e) => {
+              e.stopPropagation(); // 阻止事件冒泡
+              onDelete(item.id);
+            }}
           >
             <Text style={styles.deleteText}>Delete</Text>
           </TouchableOpacity>
@@ -234,7 +276,7 @@ export default function HomeScreen() {
           ) : (
             <>              
               <TouchableOpacity
-                style={[styles.roundButton, { backgroundColor: '#017BFF' }]}
+                style={[styles.roundButton, { backgroundColor: '#7B68EE' }]}
                 onPress={() => setIsManaging(true)}
               >
                 <Text style={styles.roundButtonText}>Manage</Text>
