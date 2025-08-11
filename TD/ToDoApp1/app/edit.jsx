@@ -1,4 +1,3 @@
-// 替换 edit.jsx 的完整内容
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -46,7 +45,7 @@ export default function EditScreen() {
     requestPermission();
   }, []);
 
-  // 调度通知（新增）
+  // 调度通知
   const scheduleNotification = async (todoTitle, date) => {
     if (!notificationPermission) {
       console.log('No notification permission');
@@ -60,11 +59,9 @@ export default function EditScreen() {
       const now = new Date();
       
       // 5分钟前提醒
-      // 修改前
       // const fiveMinBefore = new Date(date);
       // fiveMinBefore.setMinutes(fiveMinBefore.getMinutes() - 5);
       
-      // 修改后
       const fiveMinBefore = new Date(date);
       fiveMinBefore.setMinutes(fiveMinBefore.getMinutes() - 5);
       fiveMinBefore.setSeconds(0);
@@ -84,7 +81,12 @@ export default function EditScreen() {
       }
       
       // 到期提醒
-      if (date > now) {
+      // 添加精确时间变量定义
+      const preciseDate = new Date(date);
+      preciseDate.setSeconds(0);
+      preciseDate.setMilliseconds(0);
+
+      if (preciseDate > now) {
         await Notifications.scheduleNotificationAsync({
           content: {
             title: '🔔 To-Do Due',
@@ -108,11 +110,11 @@ export default function EditScreen() {
     }
 
     try {
-      // 在 handleSave 函数中（约第 114 行）
+
       const updatedTodo = {
         ...todo,
         title: title.trim(),
-        // 关键修复：提交前精确时间
+
         dueDate: new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate(), dueDate.getHours(), dueDate.getMinutes(), 0, 0).toISOString()
       };
       
@@ -140,21 +142,10 @@ export default function EditScreen() {
   const handleDateChange = (event, selectedDate) => {
     setShowDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const newDate = new Date(selectedDate);
+      newDate.setHours(dueDate.getHours(), dueDate.getMinutes(), 0, 0);
       
-      if (selectedDate < today) {
-        Alert.alert(
-          'Date Notice',
-          `The selected date ${selectedDate.toLocaleDateString()} is in the past. Are you sure you want to modify it?`,
-          [
-            { text: 'Confirm', onPress: () => setDueDate(selectedDate) },
-            { text: 'Reselect', onPress: () => setShowDatePicker(true) }
-          ]
-        );
-      } else {
-        setDueDate(selectedDate);
-      }
+      checkAndSetDate(newDate);
     }
   };
 
@@ -162,8 +153,25 @@ export default function EditScreen() {
     setShowTimePicker(Platform.OS === 'ios');
     if (selectedTime) {
       const newDate = new Date(dueDate);
-      newDate.setHours(selectedTime.getHours());
-      newDate.setMinutes(selectedTime.getMinutes());
+      newDate.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
+      
+      checkAndSetDate(newDate);
+    }
+  };
+
+  const checkAndSetDate = (newDate) => {
+    const now = new Date();
+    
+    if (newDate <= now) {
+      Alert.alert(
+        'Time Notice',
+        `The selected time ${newDate.toLocaleString()} has already passed. Are you sure you want to use it?`,
+        [
+          { text: 'Confirm', onPress: () => setDueDate(newDate) },
+          { text: 'Reselect', onPress: () => setShowTimePicker(true) }
+        ]
+      );
+    } else {
       setDueDate(newDate);
     }
   };

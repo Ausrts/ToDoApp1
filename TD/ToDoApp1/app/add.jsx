@@ -38,11 +38,18 @@ export default function AddTodoScreen() {
         'Notification Permission',
         'Notification permission is required to remind you of tasks at the specified time. Please enable notification permission in settings.'
       );
+    } else if (Platform.OS === 'android') {
+      // Restore Android high-priority channel
+      await Notifications.setNotificationChannelAsync('high-priority', {
+        name: 'ToDo Reminders',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
     }
   };
 
   // Schedule actual phone notifications
-  // 在 scheduleNotification 函数中（约第 63 行）
   const scheduleNotification = async (todoTitle, dueDate) => {
     if (!notificationPermission) {
       Alert.alert('Reminder', 'Please enable notification permission in settings to receive reminders');
@@ -51,12 +58,11 @@ export default function AddTodoScreen() {
   
     try {
       const now = new Date();
-      // 关键修复：精确到整分钟
       const preciseDueDate = new Date(dueDate);
       preciseDueDate.setSeconds(0);
       preciseDueDate.setMilliseconds(0);
   
-      // 5分钟前提醒（恢复此逻辑）
+      // Reminder 5 minutes before
       const fiveMinBefore = new Date(preciseDueDate);
       fiveMinBefore.setMinutes(fiveMinBefore.getMinutes() - 5);
       fiveMinBefore.setSeconds(0);
@@ -175,12 +181,10 @@ export default function AddTodoScreen() {
       return;
     }
 
-    // 在 addMutation.mutate 调用处（约第 198 行）
     addMutation.mutate({
       title: title.trim(),
       completed: false,
       userId: 1,
-      // 关键修复：提交前精确时间
       dueDate: new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate(), dueDate.getHours(), dueDate.getMinutes(), 0, 0).toISOString()
     });
   };
