@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import ReactQueryProvider from './context/ReactQueryProvider';
 
+
 export default function RootLayout() {
   return (
     <ReactQueryProvider>
