@@ -60,8 +60,15 @@ export default function EditScreen() {
       const now = new Date();
       
       // 5分钟前提醒
+      // 修改前
+      // const fiveMinBefore = new Date(date);
+      // fiveMinBefore.setMinutes(fiveMinBefore.getMinutes() - 5);
+      
+      // 修改后
       const fiveMinBefore = new Date(date);
       fiveMinBefore.setMinutes(fiveMinBefore.getMinutes() - 5);
+      fiveMinBefore.setSeconds(0);
+      fiveMinBefore.setMilliseconds(0);
       
       if (fiveMinBefore > now) {
         await Notifications.scheduleNotificationAsync({
@@ -81,11 +88,11 @@ export default function EditScreen() {
         await Notifications.scheduleNotificationAsync({
           content: {
             title: '🔔 To-Do Due',
-            body: `"${todoTitle}" is now due`,
+            body: `${todoTitle} is now due`,
             sound: true,
             priority: Notifications.AndroidNotificationPriority.HIGH,
           },
-          trigger: date,
+          trigger: preciseDate,
         });
         console.log('到期提醒已设置');
       }
@@ -101,10 +108,12 @@ export default function EditScreen() {
     }
 
     try {
-      const updatedTodo = { 
-        ...todo, 
+      // 在 handleSave 函数中（约第 114 行）
+      const updatedTodo = {
+        ...todo,
         title: title.trim(),
-        dueDate: dueDate.toISOString()
+        // 关键修复：提交前精确时间
+        dueDate: new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate(), dueDate.getHours(), dueDate.getMinutes(), 0, 0).toISOString()
       };
       
       await updateTodo(updatedTodo);

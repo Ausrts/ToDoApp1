@@ -3,6 +3,7 @@
 ## 🚀 Quick Start
 
 ### Install All Dependencies (Automatically)
+
 ```bash
 npm install
 ```

@@ -53,14 +53,7 @@ const TodoItem = ({ item, onDelete, onToggleComplete, isSelecting, isSelected, o
   // 处理长按（删除确认）
   const handleLongPress = () => {
     if (!isSelecting) {
-      Alert.alert(
-        'Delete To-Do',
-        `Are you sure you want to delete "${item.title}"?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: () => onDelete(item.id) },
-        ]
-      );
+      onDelete(item.id); // 直接触发删除逻辑
     }
   };
 
@@ -254,7 +247,7 @@ export default function HomeScreen() {
           {isManaging ? (
             <>              
               <TouchableOpacity
-                style={[styles.roundButton, { backgroundColor: '#017BFF' }]}
+                style={[styles.roundButton, { backgroundColor: '#7B68EE' }]}
                 onPress={handleSelectAll}
               >
                 <Text style={styles.roundButtonText}>{`Select All (${selectedItems.length}/${filteredTodos.length})`}</Text>

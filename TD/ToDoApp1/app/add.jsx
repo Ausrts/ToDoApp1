@@ -42,19 +42,26 @@ export default function AddTodoScreen() {
   };
 
   // Schedule actual phone notifications
+  // 在 scheduleNotification 函数中（约第 63 行）
   const scheduleNotification = async (todoTitle, dueDate) => {
     if (!notificationPermission) {
       Alert.alert('Reminder', 'Please enable notification permission in settings to receive reminders');
       return;
     }
-
+  
     try {
       const now = new Date();
-      
-      // Reminder 5 minutes before
-      const fiveMinBefore = new Date(dueDate);
+      // 关键修复：精确到整分钟
+      const preciseDueDate = new Date(dueDate);
+      preciseDueDate.setSeconds(0);
+      preciseDueDate.setMilliseconds(0);
+  
+      // 5分钟前提醒（恢复此逻辑）
+      const fiveMinBefore = new Date(preciseDueDate);
       fiveMinBefore.setMinutes(fiveMinBefore.getMinutes() - 5);
-      
+      fiveMinBefore.setSeconds(0);
+      fiveMinBefore.setMilliseconds(0);
+  
       if (fiveMinBefore > now) {
         await Notifications.scheduleNotificationAsync({
           content: {
@@ -68,15 +75,15 @@ export default function AddTodoScreen() {
       }
       
       // Due date reminder
-      if (dueDate > now) {
+      if (preciseDueDate > now) {
         await Notifications.scheduleNotificationAsync({
           content: {
             title: '🔔 To-Do Due',
-            body: `"${todoTitle}" is now due`,
+            body: `${todoTitle} is now due`,
             sound: true,
             priority: Notifications.AndroidNotificationPriority.HIGH,
           },
-          trigger: dueDate,
+          trigger: preciseDueDate,
         });
       }
       
@@ -168,11 +175,13 @@ export default function AddTodoScreen() {
       return;
     }
 
+    // 在 addMutation.mutate 调用处（约第 198 行）
     addMutation.mutate({
       title: title.trim(),
       completed: false,
       userId: 1,
-      dueDate: dueDate.toISOString()
+      // 关键修复：提交前精确时间
+      dueDate: new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate(), dueDate.getHours(), dueDate.getMinutes(), 0, 0).toISOString()
     });
   };
 
