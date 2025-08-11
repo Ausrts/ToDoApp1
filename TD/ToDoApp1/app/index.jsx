@@ -20,10 +20,8 @@ const TodoItem = ({ item, onDelete, onToggleComplete, isSelecting, isSelected, o
     const currentYear = now.getFullYear();
     const itemYear = date.getFullYear();
     
-    // Check if it is the current year
     const isCurrentYear = currentYear === itemYear;
     
-    // Determine display format based on year
     const options = isCurrentYear 
       ? {
           month: '2-digit',
@@ -42,13 +40,27 @@ const TodoItem = ({ item, onDelete, onToggleComplete, isSelecting, isSelected, o
     return date.toLocaleString('en-US', options);
   };
 
-  // 处理点击整个事项
+
   const handleItemPress = () => {
     if (isSelecting) {
       onSelect(item.id);
     } else {
-      // 点击进入编辑页面
+
       router.push({ pathname: '/edit', params: { todo: JSON.stringify(item) } });
+    }
+  };
+
+  // 处理长按（删除确认）
+  const handleLongPress = () => {
+    if (!isSelecting) {
+      Alert.alert(
+        'Delete To-Do',
+        `Are you sure you want to delete "${item.title}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: () => onDelete(item.id) },
+        ]
+      );
     }
   };
 
@@ -60,6 +72,8 @@ const TodoItem = ({ item, onDelete, onToggleComplete, isSelecting, isSelected, o
         isSelected && styles.selectedItem
       ]}
       onPress={handleItemPress}
+      onLongPress={handleLongPress}  
+      delayLongPress={800}  
     >
       {isSelecting && (
         <View style={[styles.selectButton, isSelected && styles.selectedButton]}>
@@ -71,7 +85,7 @@ const TodoItem = ({ item, onDelete, onToggleComplete, isSelecting, isSelected, o
         <TouchableOpacity
           style={styles.completeButton}
           onPress={(e) => {
-            e.stopPropagation(); // 阻止事件冒泡
+            e.stopPropagation();
             onToggleComplete(item.id, !item.completed);
           }}
         >
@@ -89,21 +103,7 @@ const TodoItem = ({ item, onDelete, onToggleComplete, isSelecting, isSelected, o
           </Text>
         )}
       </View>
-      
-      {!isSelecting && (
-        <View style={styles.buttons}>
-          {/* 移除了 Edit 按钮，只保留 Delete 按钮 */}
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.deleteButton]}
-            onPress={(e) => {
-              e.stopPropagation(); // 阻止事件冒泡
-              onDelete(item.id);
-            }}
-          >
-            <Text style={styles.deleteText}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+
     </TouchableOpacity>
   );
 };
@@ -260,7 +260,7 @@ export default function HomeScreen() {
                 <Text style={styles.roundButtonText}>{`Select All (${selectedItems.length}/${filteredTodos.length})`}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.roundButton, { backgroundColor: '#FF3B30', opacity: selectedItems.length === 0 ? 0.5 : 1 }]}
+                style={[styles.roundButton, { backgroundColor: '#ef5767', opacity: selectedItems.length === 0 ? 0.5 : 1 }]}
                 onPress={handleBatchDelete}
                 disabled={selectedItems.length === 0}
               >

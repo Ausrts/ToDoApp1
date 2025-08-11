@@ -1,61 +1,97 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { addTodo } from '../services/todoService';
 import { useNavigation } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert, StyleSheet, View, Text, TextInput, Button, Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
+
+// Configure notifications
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 export default function AddTodoScreen() {
   const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState(false);
   const navigation = useNavigation();
   const queryClient = useQueryClient();
 
-  // ✅ 使用setTimeout+Alert的兼容提醒系统
-  const scheduleLocalReminder = (todoTitle, dueDate) => {
-    const now = new Date();
-    const fiveMinBefore = new Date(dueDate);
-    fiveMinBefore.setMinutes(fiveMinBefore.getMinutes() - 5);
-    
-    // 5分钟前提醒
-    if (fiveMinBefore > now) {
-      const delay = fiveMinBefore.getTime() - now.getTime();
-      console.log(`⏰ 设置5分钟前提醒: "${todoTitle}" 将在 ${Math.round(delay/1000)} 秒后提醒`);
-      setTimeout(() => {
-        Alert.alert('⏰ 待办提醒', `"${todoTitle}" 还有5分钟到期`);
-      }, delay);
-    }
-    
-    // 到期提醒
-    if (dueDate > now) {
-      const delay = dueDate.getTime() - now.getTime();
-      console.log(`🔔 设置到期提醒: "${todoTitle}" 将在 ${Math.round(delay/1000)} 秒后提醒`);
-      setTimeout(() => {
-        Alert.alert('🔔 待办到期', `"${todoTitle}" 现在到期了`);
-      }, delay);
+  // Request notification permission
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
+
+  const requestNotificationPermission = async () => {
+    const { status } = await Notifications.requestPermissionsAsync();
+    setNotificationPermission(status === 'granted');
+    if (status !== 'granted') {
+      Alert.alert(
+        'Notification Permission',
+        'Notification permission is required to remind you of tasks at the specified time. Please enable notification permission in settings.'
+      );
     }
   };
 
-  // 显示添加成功通知
-  const showLocalNotification = (todoTitle) => {
-    Alert.alert(
-      '✅ 待办已添加',
-      `"${todoTitle}" 已成功添加，将在指定时间提醒您！`,
-      [{ text: '确定' }]
-    );
+  // Schedule actual phone notifications
+  const scheduleNotification = async (todoTitle, dueDate) => {
+    if (!notificationPermission) {
+      Alert.alert('Reminder', 'Please enable notification permission in settings to receive reminders');
+      return;
+    }
+
+    try {
+      const now = new Date();
+      
+      // Reminder 5 minutes before
+      const fiveMinBefore = new Date(dueDate);
+      fiveMinBefore.setMinutes(fiveMinBefore.getMinutes() - 5);
+      
+      if (fiveMinBefore > now) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '⏰ To-Do Reminder',
+            body: `"${todoTitle}" is due in 5 minutes`,
+            sound: true,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: fiveMinBefore,
+        });
+      }
+      
+      // Due date reminder
+      if (dueDate > now) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '🔔 To-Do Due',
+            body: `"${todoTitle}" is now due`,
+            sound: true,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: dueDate,
+        });
+      }
+      
+      console.log('Notification scheduled successfully');
+    } catch (error) {
+      console.error('Failed to set notification:', error);
+    }
   };
 
-  // ✅ 修正后的Mutation，使用scheduleLocalReminder
   const addMutation = useMutation({
     mutationFn: addTodo,
     onSuccess: async (newTodo) => {
       try {
         const existingTodos = JSON.parse(await AsyncStorage.getItem('@todos')) || [];
 
-        // 生成唯一ID
         const existingIds = existingTodos.map(todo => todo.id);
         let newId = Date.now() + Math.floor(Math.random() * 1000);
         while (existingIds.includes(newId)) {
@@ -75,22 +111,26 @@ export default function AddTodoScreen() {
         
         queryClient.invalidateQueries({ queryKey: ['todos'] });
         
-        // ✅ 使用兼容的提醒系统
-        scheduleLocalReminder(todoToAdd.title, new Date(todoToAdd.dueDate));
-        showLocalNotification(todoToAdd.title);
+        // Use the actual notification system
+        await scheduleNotification(todoToAdd.title, new Date(todoToAdd.dueDate));
+        
+        Alert.alert(
+          '✅ Added Successfully',
+          `"${todoToAdd.title}" has been added and will remind you at the specified time via notification`,
+          [{ text: 'OK' }]
+        );
         
         navigation.goBack();
       } catch (error) {
-        console.error('保存失败:', error);
-        Alert.alert('错误', '保存失败，请重试');
+        console.error('Save failed:', error);
+        Alert.alert('Error', 'Save failed, please try again');
       }
     },
     onError: (error) => {
-      Alert.alert('错误', `添加失败: ${error.message}`);
+      Alert.alert('Error', `Add failed: ${error.message}`);
     },
   });
 
-  // Handle date selection
   const handleDateChange = (event, selectedDate) => {
     setShowDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
@@ -99,11 +139,11 @@ export default function AddTodoScreen() {
       
       if (selectedDate < today) {
         Alert.alert(
-          '日期提示',
-          `选择的日期 ${selectedDate.toLocaleDateString()} 是过去的日期，您确定要添加吗？`,
+          'Date Notice',
+          `The selected date ${selectedDate.toLocaleDateString()} is in the past. Are you sure you want to add it?`,
           [
-            { text: '确定', onPress: () => setDueDate(selectedDate) },
-            { text: '重新选择', onPress: () => setShowDatePicker(true) }
+            { text: 'Confirm', onPress: () => setDueDate(selectedDate) },
+            { text: 'Reselect', onPress: () => setShowDatePicker(true) }
           ]
         );
       } else {
@@ -122,12 +162,9 @@ export default function AddTodoScreen() {
     }
   };
 
-  const showDatePickerDialog = () => setShowDatePicker(true);
-  const showTimePickerDialog = () => setShowTimePicker(true);
-
   const handleSubmit = () => {
     if (!title.trim()) {
-      Alert.alert('输入错误', '请输入待办标题');
+      Alert.alert('Input Error', 'Please enter the to-do title');
       return;
     }
 
@@ -141,11 +178,11 @@ export default function AddTodoScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>添加新待办</Text>
+      <Text style={styles.title}>Add New To-Do</Text>
 
       <TextInput
         style={styles.input}
-        placeholder="请输入待办标题"
+        placeholder="Enter to-do title"
         value={title}
         onChangeText={setTitle}
         autoFocus
@@ -153,12 +190,12 @@ export default function AddTodoScreen() {
 
       <View style={styles.dateContainer}>
         <Button
-          title="选择截止日期"
-          onPress={showDatePickerDialog}
+          title="Select Due Date"
+          onPress={() => setShowDatePicker(true)}
           color="#017BFF"
         />
         <Text style={styles.dateText}>
-          已选择: {dueDate.toLocaleDateString()}
+          Selected Date: {dueDate.toLocaleDateString()}
         </Text>
         {showDatePicker && (
           <DateTimePicker
@@ -172,12 +209,12 @@ export default function AddTodoScreen() {
 
       <View style={styles.dateContainer}>
         <Button
-          title="设置提醒时间"
-          onPress={showTimePickerDialog}
+          title="Set Reminder Time"
+          onPress={() => setShowTimePicker(true)}
           color="#017BFF"
         />
         <Text style={styles.dateText}>
-          提醒时间: {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          Reminder Time: {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </Text>
         {showTimePicker && (
           <DateTimePicker
@@ -191,12 +228,12 @@ export default function AddTodoScreen() {
 
       <View style={styles.buttonContainer}>
         <Button
-          title="取消"
+          title="Cancel"
           onPress={() => navigation.goBack()}
           color="#017BFF"
         />
         <Button
-          title="添加"
+          title="Add"
           onPress={handleSubmit}
           color="#017BFF"
           disabled={addMutation.isPending}

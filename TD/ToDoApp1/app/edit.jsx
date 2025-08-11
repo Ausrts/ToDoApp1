@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// 替换 edit.jsx 的完整内容
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   TextInput, 
@@ -13,22 +14,89 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { updateTodo } from '../services/todoService';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Notifications from 'expo-notifications';
+
+// Configure notifications
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 export default function EditScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { todo: todoString } = useLocalSearchParams();
   
-  // Parse the to-do item data
   const todo = todoString ? JSON.parse(todoString) : { id: null, title: '' };
   const [title, setTitle] = useState(todo.title || '');
   const [dueDate, setDueDate] = useState(todo.dueDate ? new Date(todo.dueDate) : new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState(false);
+
+  // 请求通知权限
+  useEffect(() => {
+    const requestPermission = async () => {
+      const { status } = await Notifications.requestPermissionsAsync();
+      setNotificationPermission(status === 'granted');
+    };
+    requestPermission();
+  }, []);
+
+  // 调度通知（新增）
+  const scheduleNotification = async (todoTitle, date) => {
+    if (!notificationPermission) {
+      console.log('No notification permission');
+      return;
+    }
+
+    try {
+      // 取消之前的通知
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      
+      const now = new Date();
+      
+      // 5分钟前提醒
+      const fiveMinBefore = new Date(date);
+      fiveMinBefore.setMinutes(fiveMinBefore.getMinutes() - 5);
+      
+      if (fiveMinBefore > now) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '⏰ To-Do Reminder',
+            body: `"${todoTitle}" is due in 5 minutes`,
+            sound: true,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: fiveMinBefore,
+        });
+        console.log('5分钟提醒已设置');
+      }
+      
+      // 到期提醒
+      if (date > now) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '🔔 To-Do Due',
+            body: `"${todoTitle}" is now due`,
+            sound: true,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: date,
+        });
+        console.log('到期提醒已设置');
+      }
+    } catch (error) {
+      console.error('通知调度失败:', error);
+    }
+  };
 
   const handleSave = async () => {
     if (!title.trim()) {
-      Alert.alert('错误', '请输入待办内容');
+      Alert.alert('Error', 'Please enter the to-do content');
       return;
     }
 
@@ -38,20 +106,28 @@ export default function EditScreen() {
         title: title.trim(),
         dueDate: dueDate.toISOString()
       };
+      
       await updateTodo(updatedTodo);
       
-      // Refresh the to-do list
+      // 刷新待办列表
       await queryClient.invalidateQueries(['todos']);
       
-      // Go back to the previous page
+      // 调度新的通知
+      await scheduleNotification(title.trim(), dueDate);
+      
+      Alert.alert(
+        '✅ Updated Successfully',
+        `"${title}" has been updated and new reminders have been set`,
+        [{ text: 'OK' }]
+      );
+      
       router.back();
     } catch (error) {
-      Alert.alert('错误', '保存失败，请重试');
+      Alert.alert('Error', 'Save failed, please try again');
       console.error('Save error:', error);
     }
   };
 
-  // 处理日期选择
   const handleDateChange = (event, selectedDate) => {
     setShowDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
@@ -60,11 +136,11 @@ export default function EditScreen() {
       
       if (selectedDate < today) {
         Alert.alert(
-          '日期提示',
-          `选择的日期 ${selectedDate.toLocaleDateString()} 是过去的日期，您确定要修改吗？`,
+          'Date Notice',
+          `The selected date ${selectedDate.toLocaleDateString()} is in the past. Are you sure you want to modify it?`,
           [
-            { text: '确定', onPress: () => setDueDate(selectedDate) },
-            { text: '重新选择', onPress: () => setShowDatePicker(true) }
+            { text: 'Confirm', onPress: () => setDueDate(selectedDate) },
+            { text: 'Reselect', onPress: () => setShowDatePicker(true) }
           ]
         );
       } else {
@@ -73,7 +149,6 @@ export default function EditScreen() {
     }
   };
 
-  // 处理时间选择
   const handleTimeChange = (event, selectedTime) => {
     setShowTimePicker(Platform.OS === 'ios');
     if (selectedTime) {
@@ -89,11 +164,11 @@ export default function EditScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>编辑待办</Text>
+      <Text style={styles.title}>Edit To-Do</Text>
 
       <TextInput
         style={styles.input}
-        placeholder="请输入待办标题"
+        placeholder="Enter to-do title"
         value={title}
         onChangeText={setTitle}
         autoFocus
@@ -101,12 +176,12 @@ export default function EditScreen() {
 
       <View style={styles.dateContainer}>
         <Button
-          title="选择截止日期"
+          title="Select Due Date"
           onPress={showDatePickerDialog}
           color="#017BFF"
         />
         <Text style={styles.dateText}>
-          已选择: {dueDate.toLocaleDateString('zh-CN')}
+          Selected: {dueDate.toLocaleDateString()}
         </Text>
         {showDatePicker && (
           <DateTimePicker
@@ -120,12 +195,12 @@ export default function EditScreen() {
 
       <View style={styles.dateContainer}>
         <Button
-          title="设置提醒时间"
+          title="Set Reminder Time"
           onPress={showTimePickerDialog}
           color="#017BFF"
         />
         <Text style={styles.dateText}>
-          提醒时间: {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          Reminder Time: {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </Text>
         {showTimePicker && (
           <DateTimePicker
@@ -139,12 +214,12 @@ export default function EditScreen() {
 
       <View style={styles.buttonContainer}>
         <Button
-          title="取消"
+          title="Cancel"
           onPress={() => router.back()}
           color="#017BFF"
         />
         <Button
-          title="保存"
+          title="Save"
           onPress={handleSave}
           color="#017BFF"
         />
