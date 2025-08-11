@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+
 const Storage = {
   getItem: async (key) => {
     // Fix: Directly check if localStorage exists
